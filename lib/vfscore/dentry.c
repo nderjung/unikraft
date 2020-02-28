@@ -81,6 +81,11 @@ dentry_alloc(struct dentry *parent_dp, struct vnode *vp, const char *path)
 	dp->d_vnode = vp;
 	dp->d_mount = mp;
 	dp->d_path = strdup(path);
+
+	if (!dp->d_path) {
+		return NULL;
+	}
+
 	UK_INIT_LIST_HEAD(&dp->d_child_list);
 
 	if (parent_dp) {
@@ -133,11 +138,12 @@ static void dentry_children_remove(struct dentry *dp)
 
 }
 
-void
+int
 dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path)
 {
 	struct dentry *old_pdp = dp->d_parent;
 	char *old_path = dp->d_path;
+	int error = 0;
 
 	if (old_pdp) {
 		uk_mutex_lock(&old_pdp->d_lock);
@@ -162,6 +168,9 @@ dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path)
 	uk_hlist_del(&dp->d_link);
 	// Update dp.
 	dp->d_path = strdup(path);
+	if (!dp->d_path)
+		error = ENOMEM;
+
 	dp->d_parent = parent_dp;
 	// Insert dp updated hash info into the hashtable.
 	uk_hlist_add_head(&dp->d_link,
@@ -173,6 +182,7 @@ dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path)
 	}
 
 	free(old_path);
+	return error;
 }
 
 void
