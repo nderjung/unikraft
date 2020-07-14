@@ -1,0 +1,18 @@
+menuconfig LIBPOSIX_IOMULTIPLEX
+	bool "posix-iomultiplex: Abstractions for aynchronous IO multiplexing"
+	default n
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select LIBPOSIX_SOCKET
+
+if LIBPOSIX_IOMULTIPLEX
+
+config LIBPOSIX_SELECT
+	bool "select: synchronous I/O multiplexing"
+	default y
+
+config LIBPOSIX_POLL
+	bool: "poll: wait for some event on a file descriptor "
+	default y
+
+endif
