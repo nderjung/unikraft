@@ -1,0 +1,10 @@
+menuconfig LIBFDTABLE
+	bool "fdtable: File descriptor table"
+	default n
+	help
+		This microlibrary provides the open(), read(), write(), ioctl() and close()
+		POSIX prototypes in order to manipulate generic file descriptors.  Other
+		microlibraries can register implementations against these 
+
+if LIBFDTABLE
+endif
