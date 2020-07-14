@@ -125,6 +125,14 @@ config VIRTIO_9P
        select LIBUKSGLIST
        help
               Virtio 9P driver.
+
+config VIRTIO_VSOCK
+       bool "Virtio-Vsock device"
+       default n
+       imply VIRTIO_PCI if ARCH_X86_64
+       select POSIX_SOCKET
+       help
+              Configuration-agnostic guest/host communication driver.
 endmenu
 
 config LIBGICV2
