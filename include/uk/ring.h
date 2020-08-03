@@ -1,17 +1,25 @@
-/*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- *
- * Copyright (c) 2007-2009 Kip Macy <kmacy@freebsd.org>
- * All rights reserved.
+/* SPDX-License-Identifier: BSD-3-Clause */
+/*
+ * Authors: Kip Macy <kmacy@freebsd.org>
+ *          Alexander Jung <alexander.jung@neclab.eu>
+ * 
+ * Copyright (c) 2007-2009, Kip Macy <kmacy@freebsd.org>
+ * Copyright (c) 2010-2017, Intel Corporation.
+ * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation.
+ *               All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -24,9 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
- *
  */
 
 #ifndef __UK_RING_H__
@@ -62,6 +67,7 @@
 		volatile uint32_t br_cons_tail; \
 		int               br_cons_size; \
 		int               br_cons_mask; \
+
 		struct uk_mutex  *br_lock;  \
 		br_type           br_ring[0]; \
 	} UK_RING_NAME(br_name, t)
@@ -72,6 +78,76 @@
 #else
 #define uk_ring_debug_set_elem(br, i, val)
 #endif /* DEBUG_BUFRING */
+
+/**
+ * @internal This function updates the producer head for enqueue
+ *
+ * @param r
+ *   A pointer to the ring structure
+ * @param is_sp
+ *   Indicates whether multi-producer path is needed or not
+ * @param n
+ *   The number of elements we will want to enqueue, i.e. how far should the
+ *   head be moved
+ * @param behavior
+ *   RTE_RING_QUEUE_FIXED:    Enqueue a fixed number of items from a ring
+ *   RTE_RING_QUEUE_VARIABLE: Enqueue as many items as possible from ring
+ * @param old_head
+ *   Returns head value as it was before the move, i.e. where enqueue starts
+ * @param new_head
+ *   Returns the current/new head value i.e. where enqueue finishes
+ * @param free_entries
+ *   Returns the amount of free space in the ring BEFORE head was moved
+ * @return
+ *   Actual number of objects enqueued.
+ *   If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
+ */
+static __rte_always_inline unsigned int
+__rte_ring_move_prod_head(struct rte_ring *r, unsigned int is_sp,
+		unsigned int n, enum rte_ring_queue_behavior behavior,
+		uint32_t *old_head, uint32_t *new_head,
+		uint32_t *free_entries)
+{
+	const uint32_t capacity = r->capacity;
+	unsigned int max = n;
+	int success;
+
+	do {
+		/* Reset n to the initial burst count */
+		n = max;
+
+		*old_head = r->prod.head;
+
+		/* add rmb barrier to avoid load/load reorder in weak
+		 * memory model. It is noop on x86
+		 */
+		rte_smp_rmb();
+
+		/*
+		 *  The subtraction is done between two unsigned 32bits value
+		 * (the result is always modulo 32 bits even if we have
+		 * *old_head > cons_tail). So 'free_entries' is always between 0
+		 * and capacity (which is < size).
+		 */
+		*free_entries = (capacity + r->cons.tail - *old_head);
+
+		/* check that we have enough room in ring */
+		if (unlikely(n > *free_entries))
+			n = (behavior == RTE_RING_QUEUE_FIXED) ?
+					0 : *free_entries;
+
+		if (n == 0)
+			return 0;
+
+		*new_head = *old_head + n;
+		if (is_sp)
+			r->prod.head = *new_head, success = 1;
+		else
+			success = rte_atomic32_cmpset(&r->prod.head,
+					*old_head, *new_head);
+	} while (unlikely(success == 0));
+	return n;
+}
 
 /*
  * multi-producer safe lock-free ring buffer enqueue
