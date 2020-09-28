@@ -295,13 +295,43 @@ EXIT_ERR:
 	return ret;
 }
 
-int
-getsockopt(int sock, int level, int optname, void *restrict optval,
+UK_TRACEPOINT(trace_posix_socket_getsockopt, "%d %d %d %p %d", int, int, int,
+		void *, socklen_t *);
+UK_TRACEPOINT(trace_posix_socket_getsockopt_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_getsockopt_err, "%d", int);
+
+int getsockopt(int sock, int level, int optname, void *restrict optval,
 		socklen_t *restrict optlen)
 {
-	uk_pr_crit("%s: not implemented\n", __func__);
-	errno = ENOTSUP;
-	return -1;
+	int ret = 0;
+	struct posix_socket_file *file = NULL;
+
+	trace_posix_socket_getsockopt(sock, level, optname, optval, optlen);
+
+	file = posix_socket_file_get(sock);
+	if (PTRISERR(file)) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+		goto EXIT_ERR;
+	}
+
+	/* Get socket options */
+	ret = posix_socket_getsockopt(file, level, optname,
+		optval, optlen);
+
+	/* release refcount */
+	vfscore_put_file(file->vfs_file);
+
+	if (ret < 0) {
+		uk_pr_err("failed to getsockopt of socket\n");
+		goto EXIT_ERR;
+	}
+
+	trace_posix_socket_getsockopt_ret(ret);
+	return ret;
+EXIT_ERR:
+	trace_posix_socket_getsockopt_err(ret);
+	return ret;
 }
 
 int
