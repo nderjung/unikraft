@@ -1,0 +1,10 @@
+menuconfig LIBUKUNIXSOCK
+  bool "ukunixsock: Sockets for local interthread commmunication"
+  default n
+  depends on LIBPOSIX_SOCKET
+  select LIBUKMPI
+  select LIBUKMPI_MBOX
+  select LIBUKRING
+
+if LIBUKUNIXSOCK
+endif
