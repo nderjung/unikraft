@@ -257,6 +257,27 @@ typedef ssize_t (*posix_socket_recv_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Read from a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param buf
+ *  The buffer for recieved data from the socket.
+ * @param len
+ *  The size of the buffer.
+ * @param flags
+ *  Bitmap of options for receiving a message.
+ * @param from
+ *  The source address.
+ * @param fromlen
+ *  The source address length.
+ */
+typedef ssize_t (*posix_socket_recvfrom_func_t)(struct posix_socket_file *sock,
+          void *restrict buf, size_t len, int flags, struct sockaddr *from,
+          socklen_t *restrict fromlen);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -283,6 +304,7 @@ struct posix_socket_ops {
   posix_socket_connect_func_t       connect;
   posix_socket_listen_func_t        listen;
   posix_socket_recv_func_t          recv;
+  posix_socket_recvfrom_func_t      recvfrom;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -515,6 +537,28 @@ posix_socket_recv(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_recv(sock, buf, len, flags);
+}
+
+
+static inline ssize_t
+posix_socket_do_recvfrom(struct posix_socket_file *sock,
+          void *buf, size_t len, int flags, struct sockaddr *from, 
+          socklen_t *fromlen)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->recvfrom);
+  return sock->driver->ops->recvfrom(sock, buf, len, flags, from, fromlen);
+}
+
+static inline ssize_t
+posix_socket_recvfrom(struct posix_socket_file *sock,
+          void *restrict buf, size_t len, int flags,
+          struct sockaddr *from, socklen_t *fromlen)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_recvfrom(sock, buf, len, flags, from, fromlen);
 }
 
 
