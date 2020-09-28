@@ -292,6 +292,22 @@ typedef ssize_t (*posix_socket_recvmsg_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Send a message on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param buf
+ *  The buffer for sending data to the socket.
+ * @param len
+ *  The length of the data to send on the socket.
+ * @param flags
+ *  Bitwise OR of zero or more flags for the socket.
+ */
+typedef ssize_t (*posix_socket_send_func_t)(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -320,6 +336,7 @@ struct posix_socket_ops {
 	posix_socket_recv_func_t          recv;
 	posix_socket_recvfrom_func_t      recvfrom;
 	posix_socket_recvmsg_func_t       recvmsg;
+	posix_socket_send_func_t          send;
 	/* vfscore ops */
 	posix_socket_close_func_t         close;
 };
@@ -594,6 +611,26 @@ posix_socket_recvmsg(struct posix_socket_file *sock,
 		return -ENOSYS;
 
 	return posix_socket_do_recvmsg(sock, msg, flags);
+}
+
+
+static inline ssize_t
+posix_socket_do_send(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->send);
+	return sock->driver->ops->send(sock, buf, len, flags);
+}
+
+static inline ssize_t
+posix_socket_send(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags)
+{
+	if (unlikely(!sock))
+		return -ENOSYS;
+
+	return posix_socket_do_send(sock, buf, len, flags);
 }
 
 
