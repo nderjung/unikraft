@@ -92,6 +92,21 @@ struct posix_socket_driver {
 typedef int (*posix_socket_driver_init_func_t)(struct posix_socket_driver *d);
 
 /**
+ * Create a connection on a socket.
+ *
+ * @param driver
+ *  The socket driver.
+ * @param family
+ *  Specifies a communication family domain and thus driver.
+ * @param type
+ *  Specifies communication semantics.
+ * @param protocol
+ *  Specifies a particular protocol to be used with the socket. 
+ */
+typedef void *(*posix_socket_create_func_t)(struct posix_socket_driver *d,
+          int family, int type, int protocol);
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -106,9 +121,31 @@ typedef int (*posix_socket_close_func_t)(struct posix_socket_file *sock);
 struct posix_socket_ops {
   /* The initialization function on socket registration. */
   posix_socket_driver_init_func_t   init;
+  /* POSIX interfaces */
+  posix_socket_create_func_t        create;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
+
+
+static inline void *
+posix_socket_do_create(struct posix_socket_driver *d,
+          int family, int type, int protocol)
+{
+  UK_ASSERT(d);
+  UK_ASSERT(d->ops->create);
+  return d->ops->create(d, family, type, protocol);
+}
+
+static inline void *
+posix_socket_create(struct posix_socket_driver *d,
+          int family, int type, int protocol)
+{
+  if (unlikely(!d))
+    return NULL;
+
+  return posix_socket_do_create(d, family, type, protocol);
+}
 
 
 static inline int
