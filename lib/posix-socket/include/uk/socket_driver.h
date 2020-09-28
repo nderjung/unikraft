@@ -106,6 +106,20 @@ typedef int (*posix_socket_driver_init_func_t)(struct posix_socket_driver *d);
 typedef void *(*posix_socket_create_func_t)(struct posix_socket_driver *d,
 		int family, int type, int protocol);
 
+
+/**
+ * Accept a connection on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param addr
+ *  The address of the peer socket.
+ * @param addr_len
+ *  Specifies the size, in bytes, of the address structure pointed to by addr.
+ */
+typedef void *(*posix_socket_accept_func_t)(struct posix_socket_file *sock,
+		struct sockaddr *restrict addr, socklen_t *restrict addr_len);
+
 /**
  * Close the socket.
  *
@@ -123,6 +137,7 @@ struct posix_socket_ops {
 	posix_socket_driver_init_func_t   init;
 	/* POSIX interfaces */
 	posix_socket_create_func_t        create;
+	posix_socket_accept_func_t        accept;
 	/* vfscore ops */
 	posix_socket_close_func_t         close;
 };
@@ -145,6 +160,28 @@ posix_socket_create(struct posix_socket_driver *d,
 		return NULL;
 
 	return posix_socket_do_create(d, family, type, protocol);
+}
+
+
+static inline void *
+posix_socket_do_accept(struct posix_socket_file *sock,
+		struct sockaddr *restrict addr,
+		socklen_t *restrict addr_len)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->accept);
+	return sock->driver->ops->accept(sock, addr, addr_len);
+}
+
+static inline void *
+posix_socket_accept(struct posix_socket_file *sock,
+		struct sockaddr *restrict addr,
+		socklen_t *restrict addr_len)
+{
+	if (unlikely(!sock))
+		return NULL;
+
+	return posix_socket_do_accept(sock, addr, addr_len);
 }
 
 
