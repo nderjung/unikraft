@@ -53,6 +53,11 @@ posix_socket_vfscore_read(struct vnode *s_vnode,
 int
 posix_socket_vfscore_write(struct vnode *s_vnode,
 		struct uio *buf, int ioflag __unused);
+int
+posix_socket_vfscore_ioctl(struct vnode *s_vnode,
+		struct vfscore_file *vfscore_file __unused,
+		unsigned long request,
+		void *buf);
 
 /**
  * Return the socket file structure used by a file descriptor.
