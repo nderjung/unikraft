@@ -89,13 +89,57 @@ SOCKET_CLEANUP:
   goto EXIT;
 }
 
+UK_TRACEPOINT(trace_posix_socket_accept, "%d %p %p", int,
+          struct sockaddr *restrict, socklen_t *restrict);
+UK_TRACEPOINT(trace_posix_socket_accept_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_accept_err, "%d", int);
+
 int
 accept(int sock, struct sockaddr *restrict addr,
           socklen_t *restrict addr_len)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int vfs_fd;
+  int ret = 0;
+  void *new_sock;
+	struct posix_socket_file *file;
+
+  trace_posix_socket_accept(sock, addr, addr_len);
+
+	file = posix_socket_file_get(sock);
+	if (PTRISERR(file)) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+		goto EXIT;
+	}
+
+	/* Accept an incoming connection */
+	new_sock = posix_socket_accept(file, addr, addr_len);
+	if (new_sock == NULL) {
+		ret = -1;
+    uk_pr_err("failed to accept on socket\n");
+		goto EXIT_FDROP;
+	}
+
+	/* Allocate a file descriptor for the accepted connection of the same type */
+	vfs_fd = socket_alloc_fd(file->driver, file->type, new_sock);
+	if (vfs_fd < 0) {
+		ret = -1;
+		SOCKET_ERR(ENOMEM, "failed to allocate descriptor for accepted connection");
+		goto SOCKET_CLEANUP;
+	}
+
+	ret = vfs_fd;
+
+EXIT_FDROP:
+	vfscore_put_file(file->vfs_file); /* release refcount */
+  trace_posix_socket_accept_err(ret);
+  return ret;
+EXIT:
+  trace_posix_socket_accept_ret(ret);
+	return ret;
+SOCKET_CLEANUP:
+  posix_socket_close(file);
+	goto EXIT_FDROP;
 }
 
 int
