@@ -48,6 +48,7 @@ static uint64_t s_inode = 0;
 /* vnode operations */
 struct vnops posix_socket_vnops = {
   .vop_close = posix_socket_vfscore_close,
+  .vop_write = posix_socket_vfscore_write,
   .vop_read = posix_socket_vfscore_read,
   .vop_getattr = posix_socket_getattr,
   .vop_inactive = posix_socket_inactive,
@@ -227,6 +228,34 @@ posix_socket_vfscore_close(struct vnode *s_vnode,
     return errno;
   
   return ret;
+}
+
+int
+posix_socket_vfscore_write(struct vnode *s_vnode,
+          struct uio *buf, int ioflag __unused)
+{
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  file = s_vnode->v_data;
+  uk_pr_debug("%s fd:%d driver:%s sock_data:%p\n",
+          __func__,
+          file->vfs_file->fd,
+          file->driver->libname,
+          file->sock_data);
+
+  /* Write to the socket */
+  ret = posix_socket_write(file, buf->uio_iov->iov_base, buf->uio_iov->iov_len);
+  
+  /*
+   * Some socket implementations, such as LwIP, may set the errno and return to 
+   * -1 as an error, but vfs expects us to return a positive errno.
+   */
+  if (ret < 0)
+    return errno;
+
+  buf->uio_resid -= ret;
+  return 0;
 }
 
 int

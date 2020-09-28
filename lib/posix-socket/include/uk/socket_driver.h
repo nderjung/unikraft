@@ -362,6 +362,18 @@ typedef int (*posix_socket_socketpair_func_t)(struct posix_socket_driver *d,
 
 
 /**
+ * Write to a socket file descriptor.
+ *
+ * @param buf
+ *  The pointer to the buffer to write to the socket.
+ * @param count
+ *  The number of bytes to be written.
+ */
+typedef int (*posix_socket_write_func_t)(struct posix_socket_file *sock,
+          const void *buf, size_t count);
+
+
+/**
  * Read from a socket file descriptor.
  *
  * @param buf
@@ -407,6 +419,7 @@ struct posix_socket_ops {
   posix_socket_sendto_func_t        sendto;
   posix_socket_socketpair_func_t    socketpair;
   /* vfscore ops */
+  posix_socket_write_func_t         write;
   posix_socket_read_func_t          read;
   posix_socket_close_func_t         close;
 };
@@ -763,6 +776,26 @@ posix_socket_socketpair(struct posix_socket_driver *d,
     return -ENOSYS;
 
   return posix_socket_do_socketpair(d, family, type, protocol, usockvec);
+}
+
+
+static inline int
+posix_socket_do_write(struct posix_socket_file *sock,
+          const void *buf, size_t count)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->write);
+  return sock->driver->ops->write(sock, buf, count); 
+}
+
+static inline int
+posix_socket_write(struct posix_socket_file *sock,
+          const void *buf, size_t count)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_write(sock, buf, count);
 }
 
 
