@@ -46,6 +46,10 @@ struct posix_socket_driver;
 int
 posix_socket_vfscore_close(struct vnode *s_vnode,
 		struct vfscore_file *vfscore_file);
+int
+posix_socket_vfscore_read(struct vnode *s_vnode,
+		struct vfscore_file *vfscore_file __unused,
+		struct uio *buf, int ioflag __unused);
 
 /**
  * Return the socket file structure used by a file descriptor.

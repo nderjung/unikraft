@@ -362,6 +362,18 @@ typedef int (*posix_socket_socketpair_func_t)(struct posix_socket_driver *d,
 
 
 /**
+ * Read from a socket file descriptor.
+ *
+ * @param buf
+ *  The buffer to read the data from the socket into.
+ * @param count
+ *  The number of bytes to be read.
+ */
+typedef int (*posix_socket_read_func_t)(struct posix_socket_file *sock,
+		void *buf, size_t count);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -395,6 +407,7 @@ struct posix_socket_ops {
 	posix_socket_sendto_func_t        sendto;
 	posix_socket_socketpair_func_t    socketpair;
 	/* vfscore ops */
+	posix_socket_read_func_t          read;
 	posix_socket_close_func_t         close;
 };
 
@@ -750,6 +763,27 @@ posix_socket_socketpair(struct posix_socket_driver *d,
 		return -ENOSYS;
 
 	return posix_socket_do_socketpair(d, family, type, protocol, usockvec);
+}
+
+
+static inline int
+posix_socket_do_read(struct posix_socket_file *sock,
+		void *buf, size_t count)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->read);
+
+	return sock->driver->ops->read(sock, buf, count);
+}
+
+static inline int
+posix_socket_read(struct posix_socket_file *sock,
+		void *buf, size_t count)
+{
+	if (unlikely(!sock))
+		return -ENOSYS;
+
+	return posix_socket_do_read(sock, buf, count);
 }
 
 

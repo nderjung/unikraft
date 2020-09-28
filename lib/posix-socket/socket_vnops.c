@@ -48,6 +48,7 @@ static uint64_t s_inode = 0;
 /* vnode operations */
 struct vnops posix_socket_vnops = {
 	.vop_close = posix_socket_vfscore_close,
+	.vop_read = posix_socket_vfscore_read,
 	.vop_getattr = posix_socket_getattr,
 	.vop_inactive = posix_socket_inactive,
 };
@@ -225,5 +226,38 @@ posix_socket_vfscore_close(struct vnode *s_vnode,
 	if (ret < 0)
 		return errno;
 
+	return ret;
+}
+
+int
+posix_socket_vfscore_read(struct vnode *s_vnode,
+		struct vfscore_file *vfscore_file __unused,
+		struct uio *buf, int ioflag __unused)
+{
+	int ret = 0;
+	struct posix_socket_file *file = NULL;
+
+	file = s_vnode->v_data;
+	if (PTRISERR(file)) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+		goto EXIT;
+	}
+
+	uk_pr_debug("%s fd:%d driver:%s sock_data:%p\n",
+			__func__,
+			file->vfs_file->fd,
+			file->driver->libname,
+			file->sock_data);
+
+	ret = posix_socket_read(file, buf->uio_iov->iov_base, buf->uio_iov->iov_len);
+	if (ret < 0) {
+		ret = errno;
+		goto EXIT;
+	}
+
+	buf->uio_resid -= ret;
+
+EXIT:
 	return ret;
 }
