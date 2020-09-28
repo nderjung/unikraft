@@ -214,6 +214,20 @@ typedef int (*posix_socket_setsockopt_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Initiate a connection on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param addr
+ *  The address to connect to on the socket.
+ * @param addr_len
+ *  Specifies the size, in bytes, of the address structure pointed to by addr.
+ */
+typedef int (*posix_socket_connect_func_t)(struct posix_socket_file *sock,
+          const struct sockaddr *addr, socklen_t addr_len);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -237,6 +251,7 @@ struct posix_socket_ops {
   posix_socket_getsockname_func_t   getsockname;
   posix_socket_getsockopt_func_t    getsockopt;
   posix_socket_setsockopt_func_t    setsockopt;
+  posix_socket_connect_func_t       connect;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -409,6 +424,26 @@ posix_socket_setsockopt(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_setsockopt(sock, level, optname, optval, optlen);
+}
+
+
+static inline int
+posix_socket_do_connect(struct posix_socket_file *sock,
+          const struct sockaddr *addr, socklen_t addr_len)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->connect);
+  return sock->driver->ops->connect(sock, addr, addr_len);
+}
+
+static inline int
+posix_socket_connect(struct posix_socket_file *sock,
+          const struct sockaddr *addr, socklen_t addr_len)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_connect(sock, addr, addr_len);
 }
 
 

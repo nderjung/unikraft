@@ -384,12 +384,42 @@ getnameinfo(const struct sockaddr *restrict sa, socklen_t sl,
   return -1;
 }
 
+UK_TRACEPOINT(trace_posix_socket_connect, "%d %p %d", int,
+          const struct sockaddr *, socklen_t);
+UK_TRACEPOINT(trace_posix_socket_connect_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_connect_err, "%d", int);
+
 int
 connect(int sock, const struct sockaddr *addr, socklen_t addr_len)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  trace_posix_socket_connect(sock, addr, addr_len);
+
+  file = posix_socket_file_get(sock);
+  if (PTRISERR(file)) {
+    ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Connect to the socket */
+  ret = posix_socket_connect(file, addr, addr_len);
+
+  /* release refcount */
+  vfscore_put_file(file->vfs_file);
+
+  if (ret < 0) {
+    uk_pr_err("failed to connect to socket\n");
+    goto EXIT_ERR;
+  }
+
+  trace_posix_socket_connect_ret(ret);
+  return ret;
+EXIT_ERR:
+  trace_posix_socket_connect_err(ret);
+  return ret;
 }
 
 int
