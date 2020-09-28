@@ -115,9 +115,41 @@ LOCAL_SOCKET_CLEANUP:
 }
 
 
+static int
+unixsock_glue_close(struct posix_socket_file *sock)
+{
+  int ret = 0;
+  struct unixsock *unsock;
+  
+  /* Transform the socket descriptor to the unixsock pointer. */
+  unsock = (struct unixsock *)sock->sock_data;
+  if (!unsock) {
+    ret = -1;
+    SOCKET_ERR(EBADF, "failed to identify socket descriptor");
+    goto EXIT;
+  }
+
+  if (unsock->peer) {
+    unsock->peer->peer = 0;
+    /* TODO: Notify EPOLLHUP */
+  }
+  if (unsock->buffer) {
+    unixsock_ring_free(unsock->buffer, sock->driver->allocator);
+  }
+  if (unsock->connq) {
+    uk_mbox_free(sock->driver->allocator, unsock->connq);
+  }
+
+EXIT:
+  return ret;
+}
+
+
 static struct posix_socket_ops unixsock_ops = {
   /* POSIX interfaces */
   .create      = unixsock_glue_create,
+  /* vfscore ops */
+  .close       = unixsock_glue_close,
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_UNIX, &unixsock_ops, NULL);
