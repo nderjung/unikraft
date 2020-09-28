@@ -195,6 +195,25 @@ typedef int (*posix_socket_getsockopt_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Set options on the socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param level
+ *  Maniipulate the socket at either the API level or protocol level.
+ * @param optname
+ *  Any specified options are passed uninterpreted to the appropriate protocol
+ *  module for interpretation.
+ * @param optval
+ *  The option value.
+ * @param optlen
+ *  The option value length.
+ */
+typedef int (*posix_socket_setsockopt_func_t)(struct posix_socket_file *sock,
+          int level, int optname, const void *optval, socklen_t optlen);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -217,6 +236,7 @@ struct posix_socket_ops {
   posix_socket_getpeername_func_t   getpeername;
   posix_socket_getsockname_func_t   getsockname;
   posix_socket_getsockopt_func_t    getsockopt;
+  posix_socket_setsockopt_func_t    setsockopt;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -367,6 +387,28 @@ posix_socket_getsockopt(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_getsockopt(sock, level, optname, optval, optlen);
+}
+
+
+static inline int
+posix_socket_do_setsockopt(struct posix_socket_file *sock,
+          int level, int optname, const void *optval,
+          socklen_t optlen)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->setsockopt);
+  return sock->driver->ops->setsockopt(sock, level, optname, optval, optlen);
+}
+
+static inline int
+posix_socket_setsockopt(struct posix_socket_file *sock,
+          int level, int optname, const void *optval,
+          socklen_t optlen)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_setsockopt(sock, level, optname, optval, optlen);
 }
 
 

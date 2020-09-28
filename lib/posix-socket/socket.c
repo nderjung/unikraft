@@ -334,13 +334,44 @@ EXIT_ERR:
   return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_setsockopt, "%d %d %d %p %d", int, int, int,
+          const void *, socklen_t);
+UK_TRACEPOINT(trace_posix_socket_setsockopt_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_setsockopt_err, "%d", int);
+
 int
 setsockopt(int sock, int level, int optname, const void *optval,
           socklen_t optlen)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  trace_posix_socket_setsockopt(sock, level, optname, optval, optlen);
+
+  file = posix_socket_file_get(sock);
+  if (PTRISERR(file)) {
+    ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Set socket options */
+  ret = posix_socket_setsockopt(file, level, optname,
+          optval, optlen);
+
+  /* release refcount */
+  vfscore_put_file(file->vfs_file);
+
+  if (ret < 0) {
+    uk_pr_err("failed to getsockopt of socket\n");
+    goto EXIT_ERR;
+  }
+
+  trace_posix_socket_setsockopt_ret(ret);
+  return ret;
+EXIT_ERR:
+  trace_posix_socket_setsockopt_err(ret);
+  return ret;
 }
 
 int
