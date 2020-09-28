@@ -689,10 +689,60 @@ EXIT_ERR:
   return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_socketpair, "%d %d %d %p", int, int, int,
+            int *);
+UK_TRACEPOINT(trace_posix_socket_socketpair_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_socketpair_err, "%d", int);
+
 int
 socketpair(int family, int type, int protocol, int usockfd[2])
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret;
+  void *usockdata[2];
+  int vfs_fd1, vfs_fd2;
+  struct posix_socket_driver *d;
+  struct posix_socket_file *u1, *u2;
+
+  trace_posix_socket_socketpair(family, type, protocol, usockfd);
+
+  d = posix_socket_driver_get(family);
+  if (d == NULL) {
+    ret = -1;
+    SOCKET_ERR(EAFNOSUPPORT, "no socket implementation for family");
+    goto EXIT_ERR;
+  }
+
+  /* Create the socketpair using the driver */
+  ret = posix_socket_socketpair(d, family, type, protocol, usockdata);
+  if (ret < 0) {
+    uk_pr_err("failed to create socket\n");
+    goto EXIT_ERR;
+  }
+
+  /* Allocate the file descriptor */
+  vfs_fd1 = socket_alloc_fd(d, type, usockdata[0]);
+  if (vfs_fd1 < 0) {
+    ret = vfs_fd1;
+    SOCKET_ERR(PTR2ERR(vfs_fd1), "failed to allocate descriptor");
+    goto EXIT_ERR;
+  }
+
+  vfs_fd2 = socket_alloc_fd(d, type, usockdata[1]);
+  if (vfs_fd2 < 0) {
+    ret = vfs_fd2;
+    SOCKET_ERR(PTR2ERR(vfs_fd2), "failed to allocate descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Return the file descriptors to the user */
+  usockfd[0] = vfs_fd1;
+  usockfd[1] = vfs_fd2;
+
+EXIT:
+  trace_posix_socket_socketpair_ret(ret);
+  return ret;
+
+EXIT_ERR:
+  trace_posix_socket_socketpair_err(ret);
+  return ret;
 }
