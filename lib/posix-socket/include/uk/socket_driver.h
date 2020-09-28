@@ -308,6 +308,20 @@ typedef ssize_t (*posix_socket_send_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Send a message on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param msg
+ *  Message structure to minimize the number of directly supplied arguments.
+ * @param flags
+ *  Bitwise OR of zero or more flags for the socket.
+ */
+typedef ssize_t (*posix_socket_sendmsg_func_t)(struct posix_socket_file *sock,
+          const struct msghdr *msg, int flags);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -337,6 +351,7 @@ struct posix_socket_ops {
   posix_socket_recvfrom_func_t      recvfrom;
   posix_socket_recvmsg_func_t       recvmsg;
   posix_socket_send_func_t          send;
+  posix_socket_sendmsg_func_t       sendmsg;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -631,6 +646,26 @@ posix_socket_send(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_send(sock, buf, len, flags);
+}
+
+
+static inline ssize_t
+posix_socket_do_sendmsg(struct posix_socket_file *sock,
+          const struct msghdr *msg, int flags)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->sendmsg);
+  return sock->driver->ops->sendmsg(sock, msg, flags);
+}
+
+static inline ssize_t
+posix_socket_sendmsg(struct posix_socket_file *sock,
+          const struct msghdr *msg, int flags)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_sendmsg(sock, msg, flags);
 }
 
 
