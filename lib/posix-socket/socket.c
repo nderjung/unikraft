@@ -649,13 +649,44 @@ EXIT_ERR:
 	return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_sendto, "%d %p %d %d %p %d", int, const void *,
+		size_t, int, const struct sockaddr *, socklen_t);
+UK_TRACEPOINT(trace_posix_socket_sendto_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_sendto_err, "%d", int);
+
 ssize_t
 sendto(int sock, const void *buf, size_t len, int flags,
 		const struct sockaddr *dest_addr, socklen_t addrlen)
 {
-	uk_pr_crit("%s: not implemented\n", __func__);
-	errno = ENOTSUP;
-	return -1;
+	int ret = 0;
+	struct posix_socket_file *file = NULL;
+
+	trace_posix_socket_sendto(sock, buf, len, flags, dest_addr, addrlen);
+
+	file = posix_socket_file_get(sock);
+	if (PTRISERR(file)) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+		goto EXIT_ERR;
+	}
+
+	/* Send to an address over a socket */
+	ret = posix_socket_sendto(file, buf, len, flags,
+		dest_addr, addrlen);
+
+	/* release refcount */
+	vfscore_put_file(file->vfs_file);
+
+	if (ret < 0) {
+		uk_pr_err("failed to sendto on socket\n");
+		goto EXIT_ERR;
+	}
+
+	trace_posix_socket_sendto_ret(ret);
+	return ret;
+EXIT_ERR:
+	trace_posix_socket_sendto_err(ret);
+	return ret;
 }
 
 int

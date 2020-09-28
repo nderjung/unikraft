@@ -322,6 +322,27 @@ typedef ssize_t (*posix_socket_sendmsg_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Send a message on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param buf
+ *  The buffer for sending data to the socket.
+ * @param len
+ *  The length of the data to send on the socket.
+ * @param flags
+ *  Bitwise OR of zero or more flags for the socket.
+ * @param dest_addr
+ *  The destination address to send data.
+ * @param addrlen
+ *  The length of the address to send data to.
+ */
+typedef ssize_t (*posix_socket_sendto_func_t)(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags,
+		const struct sockaddr *dest_addr, socklen_t addrlen);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -352,6 +373,7 @@ struct posix_socket_ops {
 	posix_socket_recvmsg_func_t       recvmsg;
 	posix_socket_send_func_t          send;
 	posix_socket_sendmsg_func_t       sendmsg;
+	posix_socket_sendto_func_t        sendto;
 	/* vfscore ops */
 	posix_socket_close_func_t         close;
 };
@@ -666,6 +688,28 @@ posix_socket_sendmsg(struct posix_socket_file *sock,
 		return -ENOSYS;
 
 	return posix_socket_do_sendmsg(sock, msg, flags);
+}
+
+
+static inline ssize_t
+posix_socket_do_sendto(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags,
+		const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->sendto);
+	return sock->driver->ops->sendto(sock, buf, len, flags, dest_addr, addrlen);
+}
+
+static inline ssize_t
+posix_socket_sendto(struct posix_socket_file *sock,
+		const void *buf, size_t len, int flags,
+		const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+	if (unlikely(!sock))
+		return -ENOSYS;
+
+	return posix_socket_do_sendto(sock, buf, len, flags, dest_addr, addrlen);
 }
 
 
