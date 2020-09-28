@@ -91,6 +91,14 @@ struct posix_socket_driver {
  */
 typedef int (*posix_socket_driver_init_func_t)(struct posix_socket_driver *d);
 
+/**
+ * Close the socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ */
+typedef int (*posix_socket_close_func_t)(struct posix_socket_file *sock);
+
 
 /**
  * A structure containing the functions exported by the Unikraft socket driver
@@ -98,7 +106,28 @@ typedef int (*posix_socket_driver_init_func_t)(struct posix_socket_driver *d);
 struct posix_socket_ops {
 	/* The initialization function on socket registration. */
 	posix_socket_driver_init_func_t   init;
+	/* vfscore ops */
+	posix_socket_close_func_t         close;
 };
+
+
+static inline int
+posix_socket_do_close(struct posix_socket_file *sock)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->close);
+	return sock->driver->ops->close(sock);
+}
+
+static inline int
+posix_socket_close(struct posix_socket_file *sock)
+{
+	if (unlikely(!sock))
+		return -ENOSYS;
+
+	return posix_socket_do_close(sock);
+}
+
 
 /**
  * Return the driver to the corresponding AF family number
