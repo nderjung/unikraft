@@ -343,6 +343,25 @@ typedef ssize_t (*posix_socket_sendto_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Create a pair of connected sockets.
+ *
+ * @param driver
+ *  The socket driver.
+ * @param family
+ *  The domain of the sockets.
+ * @param type
+ *  The specified type of the sockets.
+ * @param protocol
+ *  Optionally the protocol.
+ * @param sockvec
+ *  The structure used in referencing the new sockets are returned in
+ *  sockvec[0] and sockvec[1].
+ */
+typedef int (*posix_socket_socketpair_func_t)(struct posix_socket_driver *d,
+		int family, int type, int protocol, void *sockvec[2]);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -374,6 +393,7 @@ struct posix_socket_ops {
 	posix_socket_send_func_t          send;
 	posix_socket_sendmsg_func_t       sendmsg;
 	posix_socket_sendto_func_t        sendto;
+	posix_socket_socketpair_func_t    socketpair;
 	/* vfscore ops */
 	posix_socket_close_func_t         close;
 };
@@ -710,6 +730,26 @@ posix_socket_sendto(struct posix_socket_file *sock,
 		return -ENOSYS;
 
 	return posix_socket_do_sendto(sock, buf, len, flags, dest_addr, addrlen);
+}
+
+
+static inline int
+posix_socket_do_socketpair(struct posix_socket_driver *d,
+		int family, int type, int protocol, void *usockvec[2])
+{
+	UK_ASSERT(d);
+	UK_ASSERT(d->ops->socketpair);
+	return d->ops->socketpair(d, family, type, protocol, usockvec);
+}
+
+static inline int
+posix_socket_socketpair(struct posix_socket_driver *d,
+		int family, int type, int protocol, void *usockvec[2])
+{
+	if (unlikely(!d))
+		return -ENOSYS;
+
+	return posix_socket_do_socketpair(d, family, type, protocol, usockvec);
 }
 
 
