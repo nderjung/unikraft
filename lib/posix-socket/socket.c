@@ -217,13 +217,43 @@ EXIT_ERR:
 	return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_getpeername, "%d %p %d", int,
+		struct sockaddr *restrict, socklen_t *restrict);
+UK_TRACEPOINT(trace_posix_socket_getpeername_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_getpeername_err, "%d", int);
+
 int
 getpeername(int sock, struct sockaddr *restrict addr,
 		socklen_t *restrict addr_len)
 {
-	uk_pr_crit("%s: not implemented\n", __func__);
-	errno = ENOTSUP;
-	return -1;
+	int ret = 0;
+	struct posix_socket_file *file = NULL;
+
+	trace_posix_socket_getpeername(sock, addr, addr_len);
+
+	file = posix_socket_file_get(sock);
+	if (PTRISERR(file)) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+		goto EXIT_ERR;
+	}
+
+	/* Get peern name of socket */
+	ret = posix_socket_getpeername(file, addr, addr_len);
+
+	/* release refcount */
+	vfscore_put_file(file->vfs_file);
+
+	if (ret < 0) {
+		uk_pr_err("failed to getpeername of socket\n");
+		goto EXIT_ERR;
+	}
+
+	trace_posix_socket_getpeername_ret(ret);
+	return ret;
+EXIT_ERR:
+	trace_posix_socket_getpeername_err(ret);
+	return ret;
 }
 
 int
