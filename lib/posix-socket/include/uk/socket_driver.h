@@ -134,6 +134,19 @@ typedef void *(*posix_socket_accept_func_t)(struct posix_socket_file *sock,
 typedef int (*posix_socket_bind_func_t)(struct posix_socket_file *sock,
           const struct sockaddr *addr, socklen_t addr_len);
 
+
+/**
+ * Shut down part of a full-duplex connection.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param how
+ *  The flag to specify the means of shuting down the socket.
+ */
+typedef int (*posix_socket_shutdown_func_t)(struct posix_socket_file *sock,
+          int how);
+
+
 /**
  * Close the socket.
  *
@@ -153,6 +166,7 @@ struct posix_socket_ops {
   posix_socket_create_func_t        create;
   posix_socket_accept_func_t        accept;
   posix_socket_bind_func_t          bind;
+  posix_socket_shutdown_func_t      shutdown;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -217,6 +231,26 @@ posix_socket_bind(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_bind(sock, addr, addr_len);
+}
+
+
+static inline int
+posix_socket_do_shutdown(struct posix_socket_file *sock,
+          int how)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->shutdown);
+	return sock->driver->ops->shutdown(sock, how);
+}
+
+static inline int
+posix_socket_shutdown(struct posix_socket_file *sock,
+          int how)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_shutdown(sock, how);
 }
 
 
