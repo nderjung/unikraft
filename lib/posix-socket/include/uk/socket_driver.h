@@ -241,6 +241,22 @@ typedef int (*posix_socket_listen_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Receive a message from a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param buf
+ *  The buffer for recieved data from the socket.
+ * @param len
+ *  The size of the buffer.
+ * @param flags
+ *  Bitwise OR of zero or more flags for the socket.
+ */
+typedef ssize_t (*posix_socket_recv_func_t)(struct posix_socket_file *sock,
+		void *buf, size_t len, int flags);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -266,6 +282,7 @@ struct posix_socket_ops {
 	posix_socket_setsockopt_func_t    setsockopt;
 	posix_socket_connect_func_t       connect;
 	posix_socket_listen_func_t        listen;
+	posix_socket_recv_func_t          recv;
 	/* vfscore ops */
 	posix_socket_close_func_t         close;
 };
@@ -478,6 +495,26 @@ posix_socket_listen(struct posix_socket_file *sock,
 		return -ENOSYS;
 
 	return posix_socket_do_listen(sock, backlog);
+}
+
+
+static inline ssize_t
+posix_socket_do_recv(struct posix_socket_file *sock,
+		void *buf, size_t len, int flags)
+{
+	UK_ASSERT(sock);
+	UK_ASSERT(sock->driver->ops->recv);
+	return sock->driver->ops->recv(sock, buf, len, flags);
+}
+
+static inline ssize_t
+posix_socket_recv(struct posix_socket_file *sock,
+		void *buf, size_t len, int flags)
+{
+	if (unlikely(!sock))
+		return -ENOSYS;
+
+	return posix_socket_do_recv(sock, buf, len, flags);
 }
 
 
