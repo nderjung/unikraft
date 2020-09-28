@@ -47,6 +47,7 @@ static uint64_t s_inode = 0;
 
 /* vnode operations */
 struct vnops posix_socket_vnops = {
+  .vop_close = posix_socket_vfscore_close,
   .vop_getattr = posix_socket_getattr,
   .vop_inactive = posix_socket_inactive,
 };
@@ -193,5 +194,36 @@ ERR_MALLOC_FILE:
   vfscore_put_fd(vfs_fd);
 ERR_EXIT:
   UK_ASSERT(ret < 0);
+  return ret;
+}
+
+int
+posix_socket_vfscore_close(struct vnode *s_vnode,
+          struct vfscore_file *vfscore_file)
+{
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+  file = s_vnode->v_data;
+
+  uk_pr_debug("%s fd:%d driver:%s: sock_data:%p\n",
+            __func__,
+            file->vfs_file->fd,
+            file->driver->libname,
+            file->sock_data);
+
+  /* Close and release the socket */
+  ret = posix_socket_close(file);
+  
+  /*
+   * Free socket file
+   * The rest of the resources will be freed by vfs
+   *
+   * TODO: vfs ignores close errors right now, so free our file
+   */
+  uk_free(file->driver->allocator, file);
+
+  if (ret < 0)
+    return errno;
+  
   return ret;
 }
