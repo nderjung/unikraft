@@ -116,6 +116,39 @@ LOCAL_SOCKET_CLEANUP:
 
 
 static int
+unixsock_glue_socketpair(struct posix_socket_driver *d, int family, int type,
+          int protocol, void *usockvec[2])
+{
+  int ret;
+  struct unixsock *u1, *u2;
+
+  u1 = unixsock_glue_create(d, family, type, protocol);
+  if (u1 == NULL) {
+    ret = -1;
+    goto EXIT;
+  }
+
+  u2 = unixsock_glue_create(d, family, type, protocol);
+  if (u2 == NULL) {
+    ret = -1;
+    goto EXIT;
+  }
+
+  u1->peer = u2;
+  u1->state |= UNIXSOCK_CONNECTED;
+  u2->peer = u1;
+  u2->state |= UNIXSOCK_CONNECTED;
+
+  usockvec[0] = (void *)u1;
+  usockvec[1] = (void *)u2;
+
+  ret = 0;
+
+EXIT:
+  return ret;
+}
+
+static int
 unixsock_glue_read(struct posix_socket_file *sock, void *buf, size_t count)
 {
   int n;
@@ -260,6 +293,7 @@ EXIT:
 static struct posix_socket_ops unixsock_ops = {
   /* POSIX interfaces */
   .create      = unixsock_glue_create,
+  .socketpair  = unixsock_glue_socketpair,
   /* vfscore ops */
   .read        = unixsock_glue_read,
   .write       = unixsock_glue_write,
