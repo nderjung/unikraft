@@ -573,12 +573,42 @@ EXIT_ERR:
   return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_send, "%d %p %d %d", int, const void *, size_t,
+          int);
+UK_TRACEPOINT(trace_posix_socket_send_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_send_err, "%d", int);
+
 ssize_t
 send(int sock, const void *buf, size_t len, int flags)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  trace_posix_socket_send(sock, buf, len, flags);
+
+  file = posix_socket_file_get(sock);
+  if (PTRISERR(file)) {
+    ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Send a structured message to a sockets */
+  ret = posix_socket_send(file, buf, len, flags);
+
+  /* release refcount */
+  vfscore_put_file(file->vfs_file);
+
+  if (ret < 0) {
+    uk_pr_err("failed to send on socket\n");
+    goto EXIT_ERR;
+  }
+
+  trace_posix_socket_send_ret(ret);
+  return ret;
+EXIT_ERR:
+  trace_posix_socket_send_err(ret);
+  return ret;
 }
 
 ssize_t
