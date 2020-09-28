@@ -115,6 +115,63 @@ LOCAL_SOCKET_CLEANUP:
 }
 
 
+static ssize_t
+unixsock_glue_write(struct posix_socket_file *sock, const void *buf,
+          size_t count)
+{
+  int n;
+  int ret = 0;
+  uint64_t len;
+  struct unixsock *unsock;
+  
+  /* Transform the socket descriptor to the unixsock pointer. */
+  unsock = (struct unixsock *)sock->sock_data;
+  if (!unsock) {
+    ret = -1;
+    SOCKET_ERR(EBADF, "failed to identify socket descriptor");
+    goto EXIT;
+  }
+
+  if (!unsock->peer) {
+    ret = -1;
+    SOCKET_ERR(EPIPE, "peer not connected");
+    goto EXIT;
+  }
+
+  if (count > CONFIG_LIBUKUNIXSOCK_BUFLEN) {
+    ret = -1;
+    SOCKET_ERR(EMSGSIZE, "write size greater than buffer length");
+    goto EXIT;
+  }
+
+  do {
+    len = MIN(unsock->peer->buffer->br_prod_size, count);
+    n = unixsock_ring_enqueue_bulk_mc(unsock->peer->buffer, buf, len, NULL);
+
+    if (n < 0) {
+      SOCKET_ERR(n, "failed to write to socket buffer");
+      goto EXIT;
+    }
+
+    ret += n;
+    count -= n;
+    buf = (caddr_t *)buf + n;
+  } while((count > 0) && !unixsock_ring_full(unsock->buffer));
+
+#if 0 /* TODO: Notify reader destination */
+  if (ret > 0 || (ret == 0 && sock->type == SOCK_DGRAM))
+#if CONFIG_LIBUKSCHED
+    uk_waitq_wait_event(&unsock->state_wq, unsock->state == UNIXSOCK_RECEIVED);
+#else
+    while(UK_READ_ONCE(unsock->state) != UNIXSOCK_RECEIVED) {};
+#endif
+#endif
+
+EXIT:
+  return ret;
+}
+
+
 static int
 unixsock_glue_close(struct posix_socket_file *sock)
 {
@@ -149,6 +206,7 @@ static struct posix_socket_ops unixsock_ops = {
   /* POSIX interfaces */
   .create      = unixsock_glue_create,
   /* vfscore ops */
+  .write       = unixsock_glue_write,
   .close       = unixsock_glue_close,
 };
 
