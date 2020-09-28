@@ -228,6 +228,19 @@ typedef int (*posix_socket_connect_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Listen for connections on a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param backlog
+ *  Defines the maximum length to which the queue of pending connections for 
+ *  the socket.
+ */
+typedef int (*posix_socket_listen_func_t)(struct posix_socket_file *sock,
+          int backlog);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -252,6 +265,7 @@ struct posix_socket_ops {
   posix_socket_getsockopt_func_t    getsockopt;
   posix_socket_setsockopt_func_t    setsockopt;
   posix_socket_connect_func_t       connect;
+  posix_socket_listen_func_t        listen;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -444,6 +458,26 @@ posix_socket_connect(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_connect(sock, addr, addr_len);
+}
+
+
+static inline int
+posix_socket_do_listen(struct posix_socket_file *sock,
+          int backlog)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->listen);
+  return sock->driver->ops->listen(sock, backlog);
+}
+
+static inline int
+posix_socket_listen(struct posix_socket_file *sock,
+          int backlog)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_listen(sock, backlog);
 }
 
 

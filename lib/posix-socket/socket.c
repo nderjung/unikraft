@@ -422,12 +422,41 @@ EXIT_ERR:
   return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_listen, "%d %d", int, int);
+UK_TRACEPOINT(trace_posix_socket_listen_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_listen_err, "%d", int);
+
 int
 listen(int sock, int backlog)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  trace_posix_socket_listen(sock, backlog);
+
+  file = posix_socket_file_get(sock);
+  if (PTRISERR(file)) {
+    ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Listen to the socket */
+  ret = posix_socket_listen(file, backlog);
+
+  /* release refcount */
+  vfscore_put_file(file->vfs_file);
+
+  if (ret < 0) {
+    uk_pr_err("failed to listen to socket\n");
+    goto EXIT_ERR;
+  }
+
+  trace_posix_socket_listen_ret(ret);
+  return ret;
+EXIT_ERR:
+  trace_posix_socket_listen_err(ret);
+  return ret;
 }
 
 ssize_t
