@@ -395,6 +395,15 @@ typedef int (*posix_socket_close_func_t)(struct posix_socket_file *sock);
 
 
 /**
+ * Manipulate the socket.
+ *
+ * @TODO
+ */
+typedef int (*posix_socket_ioctl_func_t)(struct posix_socket_file *sock,
+          int request, void *argp);
+
+
+/**
  * A structure containing the functions exported by the Unikraft socket driver
  */
 struct posix_socket_ops {
@@ -422,6 +431,7 @@ struct posix_socket_ops {
   posix_socket_write_func_t         write;
   posix_socket_read_func_t          read;
   posix_socket_close_func_t         close;
+  posix_socket_ioctl_func_t         ioctl;
 };
 
 
@@ -835,6 +845,26 @@ posix_socket_close(struct posix_socket_file *sock)
     return -ENOSYS;
 
   return posix_socket_do_close(sock);
+}
+
+
+static inline int
+posix_socket_do_ioctl(struct posix_socket_file *sock,
+          int request, void *argp)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->ioctl);
+  return sock->driver->ops->ioctl(sock, request, argp);
+}
+
+static inline int
+posix_socket_ioctl(struct posix_socket_file *sock,
+          int request, void *argp)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_ioctl(sock, request, argp);
 }
 
 
