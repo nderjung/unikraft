@@ -115,6 +115,61 @@ LOCAL_SOCKET_CLEANUP:
 }
 
 
+static int
+unixsock_glue_read(struct posix_socket_file *sock, void *buf, size_t count)
+{
+  int n;
+  int ret = 0;
+  uint64_t len;
+  struct unixsock *unsock;
+  
+  /* Transform the socket descriptor to the unixsock pointer. */
+  unsock = (struct unixsock *)sock->sock_data;
+  if (!unsock) {
+    ret = -1;
+    SOCKET_ERR(EBADF, "failed to identify socket descriptor");
+    goto EXIT;
+  }
+
+  if ((unsock->flags & SOCK_NONBLOCK) && unixsock_ring_full(unsock->buffer)) {
+    ret = -1;
+    SOCKET_ERR(EAGAIN, "socket ring buffer is full");
+    goto EXIT;
+  }
+
+  if (unixsock_ring_empty(unsock->buffer)) {
+    ret = -1;
+    SOCKET_ERR(EAGAIN, "socket ring buffer is empty");
+    goto EXIT;
+  }
+
+  do {
+    len = MIN(unsock->buffer->br_cons_size, count);
+    n = unixsock_ring_dequeue_bulk_mc(unsock->buffer, buf, len, NULL);
+
+    if (n < 0) {
+      SOCKET_ERR(n, "failed to read from socket buffer");
+      goto EXIT;
+    }
+
+    ret += n;
+    count -= n;
+  } while((count > 0) && !unixsock_ring_empty(unsock->buffer));
+
+#if 0 /* TODO: Notify writer destination */
+  if (ret > 0 || (ret == 0 && sock->type == SOCK_DGRAM))
+#if CONFIG_LIBUKSCHED
+    uk_waitq_wait_event(&unsock->state_wq, unsock->state == UNIXSOCK_RECEIVED);
+#else
+    while(UK_READ_ONCE(unsock->state) != UNIXSOCK_RECEIVED) {};
+#endif
+#endif
+
+EXIT:
+  return ret;
+}
+
+
 static ssize_t
 unixsock_glue_write(struct posix_socket_file *sock, const void *buf,
           size_t count)
@@ -206,6 +261,7 @@ static struct posix_socket_ops unixsock_ops = {
   /* POSIX interfaces */
   .create      = unixsock_glue_create,
   /* vfscore ops */
+  .read        = unixsock_glue_read,
   .write       = unixsock_glue_write,
   .close       = unixsock_glue_close,
 };
