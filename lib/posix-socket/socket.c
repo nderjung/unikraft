@@ -38,12 +38,55 @@
 #include <uk/trace.h>
 #include <errno.h>
 
+UK_TRACEPOINT(trace_posix_socket_create, "%d %d %d", int, int, int);
+UK_TRACEPOINT(trace_posix_socket_create_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_create_err, "%d", int);
+
 int
 socket(int family, int type, int protocol)
 {
-	uk_pr_crit("%s: not implemented\n", __func__);
-	errno = ENOTSUP;
-	return -1;
+	int ret = 0;
+	int vfs_fd = 0xff;
+	void *sock = NULL;
+	struct posix_socket_driver *d;
+
+	trace_posix_socket_create(family, type, protocol);
+
+	d = posix_socket_driver_get(family);
+	if (d == NULL) {
+		ret = -1;
+		SOCKET_ERR(EAFNOSUPPORT, "no socket implementation for family");
+		goto EXIT_ERR;
+	}
+
+	/* Create the socket using the driver */
+	sock = posix_socket_create(d, family, type, protocol);
+	if (sock == NULL) {
+		ret = -1;
+		SOCKET_ERR(ENOMEM, "failed to create socket");
+		goto EXIT_ERR;
+	}
+
+	/* Allocate the file descriptor */
+	vfs_fd = socket_alloc_fd(d, type, sock);
+	if (vfs_fd < 0) {
+		ret = -1;
+		SOCKET_ERR(PTR2ERR(vfs_fd), "failed to allocate descriptor");
+		goto SOCKET_CLEANUP;
+	}
+
+	/* Returning the file descriptor to the user */
+	ret = vfs_fd;
+
+EXIT:
+	trace_posix_socket_create_ret(ret);
+	return ret;
+EXIT_ERR:
+	trace_posix_socket_create_err(ret);
+	return ret;
+SOCKET_CLEANUP:
+	posix_socket_close(sock);
+	goto EXIT;
 }
 
 int
