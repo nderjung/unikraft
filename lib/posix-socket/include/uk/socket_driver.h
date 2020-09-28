@@ -278,6 +278,20 @@ typedef ssize_t (*posix_socket_recvfrom_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Read from a socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param msg
+ *  Message structure to minimize the number of directly supplied arguments.
+ * @param flags
+ *  Bitwise OR of zero or more flags for the socket.
+ */
+typedef ssize_t (*posix_socket_recvmsg_func_t)(struct posix_socket_file *sock,
+          struct msghdr *msg, int flags);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -305,6 +319,7 @@ struct posix_socket_ops {
   posix_socket_listen_func_t        listen;
   posix_socket_recv_func_t          recv;
   posix_socket_recvfrom_func_t      recvfrom;
+  posix_socket_recvmsg_func_t       recvmsg;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -559,6 +574,26 @@ posix_socket_recvfrom(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_recvfrom(sock, buf, len, flags, from, fromlen);
+}
+
+
+static inline ssize_t
+posix_socket_do_recvmsg(struct posix_socket_file *sock,
+          struct msghdr *msg, int flags)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->recvmsg);
+  return sock->driver->ops->recvmsg(sock, msg, flags);
+}
+
+static inline ssize_t
+posix_socket_recvmsg(struct posix_socket_file *sock,
+          struct msghdr *msg, int flags)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_recvmsg(sock, msg, flags);
 }
 
 
