@@ -148,6 +148,20 @@ typedef int (*posix_socket_shutdown_func_t)(struct posix_socket_file *sock,
 
 
 /**
+ * Get name of connected peer socket.
+ *
+ * @param sock
+ *  Reference to the socket.
+ * @param addr
+ *  The assigned address.
+ * @param addr_len
+ *  Specifies the size, in bytes, of the address structure pointed to by addr.
+ */
+typedef int (*posix_socket_getpeername_func_t)(struct posix_socket_file *sock,
+          struct sockaddr *restrict addr, socklen_t *restrict addr_len);
+
+
+/**
  * Close the socket.
  *
  * @param sock
@@ -167,6 +181,7 @@ struct posix_socket_ops {
   posix_socket_accept_func_t        accept;
   posix_socket_bind_func_t          bind;
   posix_socket_shutdown_func_t      shutdown;
+  posix_socket_getpeername_func_t   getpeername;
   /* vfscore ops */
   posix_socket_close_func_t         close;
 };
@@ -251,6 +266,28 @@ posix_socket_shutdown(struct posix_socket_file *sock,
     return -ENOSYS;
 
   return posix_socket_do_shutdown(sock, how);
+}
+
+
+static inline int
+posix_socket_do_getpeername(struct posix_socket_file *sock,
+          struct sockaddr *restrict addr,
+          socklen_t *restrict addr_len)
+{
+  UK_ASSERT(sock);
+  UK_ASSERT(sock->driver->ops->getpeername);
+	return sock->driver->ops->getpeername(sock, addr, addr_len);
+}
+
+static inline int
+posix_socket_getpeername(struct posix_socket_file *sock,
+          struct sockaddr *restrict addr,
+          socklen_t *restrict addr_len)
+{
+  if (unlikely(!sock))
+    return -ENOSYS;
+
+  return posix_socket_do_getpeername(sock, addr, addr_len);
 }
 
 
