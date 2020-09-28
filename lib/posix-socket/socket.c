@@ -256,13 +256,43 @@ EXIT_ERR:
   return ret;
 }
 
+UK_TRACEPOINT(trace_posix_socket_getsockname, "%d %p %p", int,
+          struct sockaddr *restrict, socklen_t *restrict);
+UK_TRACEPOINT(trace_posix_socket_getsockname_ret, "%d", int);
+UK_TRACEPOINT(trace_posix_socket_getsockname_err, "%d", int);
+
 int
 getsockname(int sock, struct sockaddr *restrict addr,
           socklen_t *restrict addr_len)
 {
-  uk_pr_crit("%s: not implemented\n", __func__);
-  errno = ENOTSUP;
-  return -1;
+  int ret = 0;
+  struct posix_socket_file *file = NULL;
+
+  trace_posix_socket_getsockname(sock, addr, addr_len);
+
+  file = posix_socket_file_get(sock);
+  if (PTRISERR(file)) {
+    ret = -1;
+		SOCKET_ERR(PTR2ERR(file), "failed to identify socket descriptor");
+    goto EXIT_ERR;
+  }
+
+  /* Get socket name of socket */
+  ret = posix_socket_getsockname(file, addr, addr_len);
+
+  /* release refcount */
+  vfscore_put_file(file->vfs_file);
+
+  if (ret < 0) {
+    uk_pr_err("failed to getsockname of socket\n");
+    goto EXIT_ERR;
+  }
+
+  trace_posix_socket_getsockname_ret(ret);
+  return ret;
+EXIT_ERR:
+  trace_posix_socket_getsockname_err(ret);
+  return ret;
 }
 
 int
