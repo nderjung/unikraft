@@ -116,6 +116,39 @@ LOCAL_SOCKET_CLEANUP:
 
 
 static int
+unixsock_glue_listen(struct posix_socket_file *sock, int backlog)
+{
+  int ret = 0;
+  struct unixsock *unsock;
+  
+  /* Transform the socket descriptor to the unixsock pointer. */
+  unsock = (struct unixsock *)sock->sock_data;
+  if (!unsock) {
+    ret = -1;
+    SOCKET_ERR(EBADF, "failed to identify socket descriptor");
+    goto EXIT;
+  }
+  
+  /* Create a maibox with defined queue size. */
+  if (!unsock->connq) {
+    unsock->connq = uk_mbox_create(sock->driver->allocator,
+            CONFIG_LIBUKUNIXSOCK_QLEN * sizeof(struct unixsock));
+    if (!unsock->connq) {
+      ret = -1;
+      SOCKET_ERR(ENOMEM, "could not allocate socket connection queue");
+      goto EXIT;
+    }
+  }
+
+  /* Update the state of the socket. */
+  unsock->state |= UNIXSOCK_LISTENING;
+
+EXIT:
+  return ret;
+}
+
+
+static int
 unixsock_glue_socketpair(struct posix_socket_driver *d, int family, int type,
           int protocol, void *usockvec[2])
 {
@@ -293,6 +326,7 @@ EXIT:
 static struct posix_socket_ops unixsock_ops = {
   /* POSIX interfaces */
   .create      = unixsock_glue_create,
+  .listen      = unixsock_glue_listen,
   .socketpair  = unixsock_glue_socketpair,
   /* vfscore ops */
   .read        = unixsock_glue_read,
