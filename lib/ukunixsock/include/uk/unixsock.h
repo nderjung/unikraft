@@ -40,6 +40,39 @@
 
 #include <sys/un.h>
 
+/*
+ * Additional error messages for unix sockets
+ */
+#define ESOCKTNOSUPPORT 124	/* Socket type not supported */
+
+/*
+ * Socket states
+ */
+#define UNIXSOCK_CLOSED     0x0000
+#define UNIXSOCK_OPEN       0x0001
+#define UNIXSOCK_BOUND      0x0002
+#define UNIXSOCK_ACTIVE     0x0004
+#define UNIXSOCK_LISTEN     0x0008
+#define UNIXSOCK_CONNECT    0x0010
+#define UNIXSOCK_ACCEPT     0x0020
+#define UNIXSOCK_BUSY       0x0040
+#define UNIXSOCK_LISTENING  (UNIXSOCK_BOUND     | UNIXSOCK_LISTEN)
+#define UNIXSOCK_CONNECTING (UNIXSOCK_BOUND     | UNIXSOCK_CONNECT)
+#define UNIXSOCK_ACCEPTING  (UNIXSOCK_LISTENING | UNIXSOCK_ACCEPT)
+#define UNIXSOCK_CONNECTED  (UNIXSOCK_BOUND     | UNIXSOCK_ACTIVE)
+// #define UNIXSOCK_CONNECTED  (UNIXSOCK_BOUND     | UNIXSOCK_ACTIVE)
+
+#define UNIXSOCK_IS_BOUND(s) \
+  (((s)->state & UNIXSOCK_BOUND) == UNIXSOCK_BOUND)
+#define UNIXSOCK_IS_LISTENING(s) \
+  (((s)->state & UNIXSOCK_LISTENING) == UNIXSOCK_LISTENING)
+#define UNIXSOCK_IS_CONNECTING(s) \
+  (((s)->state & UNIXSOCK_CONNECTING) == UNIXSOCK_CONNECTING)
+#define UNIXSOCK_IS_ACCEPTING(s) \
+  (((s)->state & UNIXSOCK_ACCEPTING) == UNIXSOCK_ACCEPTING)
+#define UNIXSOCK_IS_CONNECTED(s) \
+  (((s)->state & UNIXSOCK_CONNECTED) == UNIXSOCK_CONNECTED)
+
 UK_RING_DEFINE(unixsock_ring, char);
 
 struct unixsock;
