@@ -1,0 +1,4 @@
+posix_socket_get_family
+posix_socket_family_count
+_posix_socket_family_register
+_posix_socket_family_unregister
