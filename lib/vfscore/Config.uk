@@ -100,5 +100,28 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 		filesystem.
 endif
 
+menuconfig LIBVFSCORE_TEST
+	bool "Enable vfscore unit tests"
+	select LIBVFSCORE_TEST_MOUNT if LIBUKTEST_ALL
+	select LIBVFSCORE_TEST_STAT if LIBUKTEST_ALL
+	default n
+
+if LIBVFSCORE_TEST
+
+	config LIBVFSCORE_TEST_MOUNT
+		bool "test: mount()"
+		select LIBRAMFS
+		select LIBDEVFS
+		select LIBVFSCORE_AUTOMOUNT_ROOTFS
+		select LIBVFSCORE_ROOTFS_RAMFS
+		default n
+
+	config LIBVFSCORE_TEST_STAT
+		bool "test: stat()"
+		select LIBRAMFS
+		default n
+
+endif
+
 endmenu
 endif
