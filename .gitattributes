@@ -1,0 +1,4 @@
+Kraftfile linguist-language=YAML
+Config.uk linguist-language=KConfig
+Makefile.uk linguist-language=Makefile
+
